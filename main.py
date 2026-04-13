@@ -9,14 +9,18 @@ time.sleep_ms(1000)
 
 machine.freq(125_000_000)
 
-# NeoPixel setup
-NUM_PIXELS = 12  # Number of LEDs in the NeoPixel ring
-NEOPIXEL_PIN = 14  # GPIO pin connected to the NeoPixel data line
-np = neopixel.NeoPixel(machine.Pin(NEOPIXEL_PIN), NUM_PIXELS)
+# print("Hi")
 
-hue_mode_pin=4
-brightness_speed_pin=0
-saturation_intensity_pin=8
+# NeoPixel setup
+np = neopixel.NeoPixel(machine.Pin(29), 3)
+np27 = neopixel.NeoPixel(machine.Pin(27), 12)  # Second LED ring
+
+# np[0]=[255,255,255]
+# time.sleep_ms(1000)
+
+hue_mode_pin=3
+brightness_speed_pin=4
+saturation_intensity_pin=5
 
 # rate of change when button held
 brightness_step=0.01
@@ -51,6 +55,11 @@ effect_speed = 0.001
 effect_intensity = [1.0] * 10
 effect_timer = 0
 effect_hue_offset = 0
+
+# Control mode: 0 = both lamps, 1 = np only (pin 29), 2 = np27 only (pin 27)
+control_mode = 0
+long_press_threshold = 0.5  # seconds
+all_pressed_start_time = -1
 
 min_double_tap_time=0.1
 max_double_tap_time=0.8
@@ -90,63 +99,67 @@ import random
 def update_neopixels():
     global effect_hue_offset, effect_timer
     
-    if not effect_mode:
-        rgb = hsv_to_rgb(hue, saturation, brightness)
-        for i in range(NUM_PIXELS):
-            np[i] = rgb
-    else:
-        
-        for i in range(NUM_PIXELS):
-            if current_effect == 0:  # Rainbow Spin
-                # Intensity controls saturation
-                intensity=map_range(effect_intensity[current_effect],0,1,0.7,1.0)
-                np[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS)) % 1.0, saturation * intensity, brightness)
-                effect_hue_offset += effect_speed
+    # Update main lamp (pin 29)
+    if control_mode in [0, 1]:  # control both or control pin 29
+        if not effect_mode:
+            rgb = hsv_to_rgb(hue, saturation, brightness)
+            for i in range(NUM_PIXELS):
+                np[i] = rgb
+        else:
+            for i in range(NUM_PIXELS):
+                np[i] = hsv_to_rgb(hue, saturation, brightness)
+    
+    # Update second lamp (pin 27) - only applies effects
+    if control_mode in [0, 2]:  # control both or control pin 27
+        if not effect_mode:
+            rgb = hsv_to_rgb(hue, saturation, brightness)
+            for i in range(NUM_PIXELS):
+                np27[i] = rgb
+        else:
+            for i in range(NUM_PIXELS):
+                if current_effect == 0:  # Rainbow Spin
+                    intensity=map_range(effect_intensity[current_effect],0,1,0.7,1.0)
+                    np27[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS)) % 1.0, saturation * intensity, brightness)
+                    effect_hue_offset += effect_speed
 
-            elif current_effect == 1:  # Rainbow Cycle
-                # Intensity controls saturation
-                intensity=map_range(effect_intensity[current_effect],0,1,0.7,1.0)
-                np[i] = hsv_to_rgb((effect_hue_offset) % 1.0, saturation * intensity, brightness)
-                effect_hue_offset += effect_speed/5
+                elif current_effect == 1:  # Rainbow Cycle
+                    intensity=map_range(effect_intensity[current_effect],0,1,0.7,1.0)
+                    np27[i] = hsv_to_rgb((effect_hue_offset) % 1.0, saturation * intensity, brightness)
+                    effect_hue_offset += effect_speed/5
 
-            elif current_effect == 2:  # Pulsing
-                # Intensity controls the amplitude of the pulsing (how much it pulses)
-                intensity=map_range(effect_intensity[current_effect],0,1,0.3,1.0)
-                pulsing_brightness = 0.5 + 0.5 * math.sin(effect_timer * 50) * intensity
-                np[i] = hsv_to_rgb(hue, saturation, pulsing_brightness)
+                elif current_effect == 2:  # Pulsing
+                    intensity=map_range(effect_intensity[current_effect],0,1,0.3,1.0)
+                    pulsing_brightness = 0.5 + 0.5 * math.sin(effect_timer * 50) * intensity
+                    np27[i] = hsv_to_rgb(hue, saturation, pulsing_brightness)
 
-            elif current_effect == 3:  # Wave Effect
-                # Intensity controls the length of the wave (wider or narrower waves)
-                intensity=map_range(effect_intensity[current_effect],0,1,0.2,6)
-                wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS) * 2 * math.pi *intensity + effect_timer * 200)
-                if wave_brightness<0:
-                    wave_brightness=0
-                elif wave_brightness>1:
-                    wave_brightness=1
-                np[i] = hsv_to_rgb(hue, saturation, wave_brightness)
+                elif current_effect == 3:  # Wave Effect
+                    intensity=map_range(effect_intensity[current_effect],0,1,0.2,6)
+                    wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS) * 2 * math.pi *intensity + effect_timer * 200)
+                    if wave_brightness<0:
+                        wave_brightness=0
+                    elif wave_brightness>1:
+                        wave_brightness=1
+                    np27[i] = hsv_to_rgb(hue, saturation, wave_brightness)
 
-            elif current_effect == 4:  # Wave Effect
-                # Intensity controls the length of the wave (wider or narrower waves)
-                
-                intensity=map_range(effect_intensity[current_effect],0,1,0.2,6)
-                wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS) * 2 * math.pi*intensity + effect_timer * 200)
-                if wave_brightness<0:
-                    wave_brightness=0
-                elif wave_brightness>1:
-                    wave_brightness=1
-                np[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS)) % 1.0, saturation, wave_brightness)
-                effect_hue_offset += effect_speed
+                elif current_effect == 4:  # Wave Effect
+                    intensity=map_range(effect_intensity[current_effect],0,1,0.2,6)
+                    wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS) * 2 * math.pi*intensity + effect_timer * 200)
+                    if wave_brightness<0:
+                        wave_brightness=0
+                    elif wave_brightness>1:
+                        wave_brightness=1
+                    np27[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS)) % 1.0, saturation, wave_brightness)
+                    effect_hue_offset += effect_speed
 
-            elif current_effect == 5:  # Random Blink
-                intensity=map_range(effect_intensity[current_effect],0,1,0.3,0.01)
-                if random.random() < intensity:  # Intensity adjusts blink frequency
-                    np[i] = hsv_to_rgb(hue, saturation, brightness)
-                else:
-                    np[i] = hsv_to_rgb(hue, saturation, 0)  # Off
-
-
+                elif current_effect == 5:  # Random Blink
+                    intensity=map_range(effect_intensity[current_effect],0,1,0.3,0.01)
+                    if random.random() < intensity:
+                        np27[i] = hsv_to_rgb(hue, saturation, brightness)
+                    else:
+                        np27[i] = hsv_to_rgb(hue, saturation, 0)
                 
     np.write()
+    np27.write()
     effect_timer += effect_speed
 
 
@@ -184,6 +197,7 @@ def process_touch_inputs(device):
     global brightness, hue, saturation, brightness_direction, saturation_direction, brightness_held, saturation_held
     global effect_mode, current_effect, effect_speed, effect_intensity, tap_time, last_tap
     global effect_speed_held,effect_intensity_held,effect_intensity_direction,effect_speed_direction
+    global control_mode, all_pressed_start_time
 
     device.update()
     current_time = time.time()
@@ -192,14 +206,31 @@ def process_touch_inputs(device):
     brightness_speed_button=device.level(0)
     saturation_intensity_button=device.level(2)
 
-    if all(x > detection_level for x in (hue_mode_button, brightness_speed_button, saturation_intensity_button)):  # Hue Button
-        if current_time - last_tap > 1:  # Double tap detected
-            effect_mode = not effect_mode
-            # if effect_mode:
-            #     current_effect=1
-            print("switch mode")
-        last_tap = current_time
+    all_pressed = all(x > detection_level for x in (hue_mode_button, brightness_speed_button, saturation_intensity_button))
+    
+    if all_pressed:
+        # Track when all buttons are pressed
+        if all_pressed_start_time < 0:
+            all_pressed_start_time = current_time
+        
+        # Long press: toggle effect mode (0.5 seconds)
+        if current_time - all_pressed_start_time > long_press_threshold:
+            if last_tap < all_pressed_start_time:  # Ensure we only toggle once per press
+                effect_mode = not effect_mode
+                print("effect mode: " + str(effect_mode))
+                last_tap = current_time
     else:
+        # All buttons released
+        if all_pressed_start_time >= 0:
+            press_duration = current_time - all_pressed_start_time
+            # Short tap (less than long_press_threshold): cycle control mode
+            if press_duration < long_press_threshold:
+                control_mode = (control_mode + 1) % 3
+                modes = ["both", "pin 29", "pin 27"]
+                print("control mode: " + modes[control_mode])
+            all_pressed_start_time = -1
+    
+    if not all_pressed:
         if not effect_mode:
             # set brightness
             if brightness_speed_button > detection_level:  # Brightness Button
@@ -226,10 +257,8 @@ def process_touch_inputs(device):
                 saturation_held = False
         else:
             if hue_mode_button > detection_level:
-                if current_time - last_tap > 0.3:  # Double tap detected
-                    current_effect =current_effect+1
-                    if current_effect>5:
-                        current_effect=0
+                if current_time - last_tap > 0.3:  # Tap to cycle effects
+                    current_effect = (current_effect + 1) % 6
                     print("effect "+str(current_effect))
                 last_tap = current_time
                 
