@@ -15,6 +15,10 @@ machine.freq(125_000_000)
 np = neopixel.NeoPixel(machine.Pin(29), 3)
 np27 = neopixel.NeoPixel(machine.Pin(27), 12)  # Second LED ring
 
+# LED count for each ring
+NUM_PIXELS_NP = 3  # Ring 1 (pin 29)
+NUM_PIXELS_NP27 = 12  # Ring 2 (pin 27)
+
 # np[0]=[255,255,255]
 # time.sleep_ms(1000)
 
@@ -103,23 +107,23 @@ def update_neopixels():
     if control_mode in [0, 1]:  # control both or control pin 29
         if not effect_mode:
             rgb = hsv_to_rgb(hue, saturation, brightness)
-            for i in range(NUM_PIXELS):
+            for i in range(NUM_PIXELS_NP):
                 np[i] = rgb
         else:
-            for i in range(NUM_PIXELS):
+            for i in range(NUM_PIXELS_NP):
                 np[i] = hsv_to_rgb(hue, saturation, brightness)
     
     # Update second lamp (pin 27) - only applies effects
     if control_mode in [0, 2]:  # control both or control pin 27
         if not effect_mode:
             rgb = hsv_to_rgb(hue, saturation, brightness)
-            for i in range(NUM_PIXELS):
+            for i in range(NUM_PIXELS_NP27):
                 np27[i] = rgb
         else:
-            for i in range(NUM_PIXELS):
+            for i in range(NUM_PIXELS_NP27):
                 if current_effect == 0:  # Rainbow Spin
                     intensity=map_range(effect_intensity[current_effect],0,1,0.7,1.0)
-                    np27[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS)) % 1.0, saturation * intensity, brightness)
+                    np27[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS_NP27)) % 1.0, saturation * intensity, brightness)
                     effect_hue_offset += effect_speed
 
                 elif current_effect == 1:  # Rainbow Cycle
@@ -134,7 +138,7 @@ def update_neopixels():
 
                 elif current_effect == 3:  # Wave Effect
                     intensity=map_range(effect_intensity[current_effect],0,1,0.2,6)
-                    wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS) * 2 * math.pi *intensity + effect_timer * 200)
+                    wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS_NP27) * 2 * math.pi *intensity + effect_timer * 200)
                     if wave_brightness<0:
                         wave_brightness=0
                     elif wave_brightness>1:
@@ -143,12 +147,12 @@ def update_neopixels():
 
                 elif current_effect == 4:  # Wave Effect
                     intensity=map_range(effect_intensity[current_effect],0,1,0.2,6)
-                    wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS) * 2 * math.pi*intensity + effect_timer * 200)
+                    wave_brightness = 0.5 + 0.8 * math.sin((i / NUM_PIXELS_NP27) * 2 * math.pi*intensity + effect_timer * 200)
                     if wave_brightness<0:
                         wave_brightness=0
                     elif wave_brightness>1:
                         wave_brightness=1
-                    np27[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS)) % 1.0, saturation, wave_brightness)
+                    np27[i] = hsv_to_rgb((effect_hue_offset + (i / NUM_PIXELS_NP27)) % 1.0, saturation, wave_brightness)
                     effect_hue_offset += effect_speed
 
                 elif current_effect == 5:  # Random Blink
